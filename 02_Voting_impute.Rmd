@@ -1,0 +1,84 @@
+---
+title: "Checking_voting"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Simon's email: 
+Run separate (or one pooled) models (linear or logit/probit) of missingness on turnout in 2017/2019 as a function of likely predictors, including gig work. If gig work and other variables predict missingness —> collider bias alert. You’ll never know whether you run into collider bias because unmeasured confounders, but it’d still be somewhat informative on the variables you can measure. These models would be useful to report in an appendix - they’re not main text material but support your analytic strategy.
+
+## Missing Voting as an outcome of gig work and other covars
+```{r}
+missing_2019_naive <- glm(missing_vote2019 ~ gig_dummy, family = binomial(link = "probit"), data = ukls_voters)
+missing_2019_se <- glm(missing_vote2019 ~ gig_dummy + age + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+missing_2019_nobf <- glm(missing_vote2019 ~ gig_dummy + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+missing_2019_all <- glm(missing_vote2019 ~ gig_dummy + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+missing_2017_naive <- glm(missing_vote2017 ~ gig_dummy, family = binomial(link = "probit"), data = ukls_voters)
+missing_2017_se <- glm(missing_vote2017 ~ gig_dummy + age + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+missing_2017_nobf <- glm(missing_vote2017 ~ gig_dummy + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+missing_2017_all <- glm(missing_vote2017 ~ gig_dummy + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+stargazer(missing_2019_naive, missing_2019_se, missing_2019_nobf, missing_2019_all, 
+          missing_2017_naive, missing_2017_se, missing_2017_nobf, missing_2017_all, type = "text")
+stargazer(missing_2019_naive, missing_2019_se, missing_2019_nobf, missing_2019_all, 
+          missing_2017_naive, missing_2017_se, missing_2017_nobf, missing_2017_all, type = "html", out = "models_missingXgig.html")
+
+```
+
+Run separate models (linear or logit/probit) of turnout in 2017/2019 as a function of likely predictors (importantly, not including gig work as predictor) - this would include political interest but also education, gender, and turnout at the other election (i.e. 2017 turnout for the 2019 turnout model and vice versa). It’s not ideal to use 2019 turnout to predict 2017 turnout, but it’s just a prediction exercise, so it’s fine. You can then use predictions of these models to impute turnout for missing values. This is a bit more sophisticated than the imputation approach you suggest, but still straightforward to do.
+
+## Predicting Voter turnout (imputation model)
+```{r}
+model_2017imp <- glm(vote_2017 ~ vote_2019 + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+model_2019imp <- glm(vote_2019 ~ vote_2017 + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+
+stargazer(model_2017imp, model_2019imp, type = "text")
+stargazer(model_2017imp, model_2019imp, type = "html", out = "models_votingimp.html")
+```
+
+4. For your regular models, you can then use the imputed turnout variables as outcomes separately or combine them as you suggest (voted either 2017 or 2019 or both). You should still double-check whether the imputed values make sense - for instance, if a person was under age in 2017 it does not make sense to set voted to “yes” - you’d have to manually correct that to “no” then.
+```{r}
+ukls_filter$vote_2019_pred <- predict.glm(model_2019imp, newdata = ukls_filter, type = "response")
+ukls_filter$vote_2017_pred <- predict.glm(model_2017imp, newdata = ukls_filter, type = "response")
+ukls_filter <- ukls_filter %>%
+  mutate(voted_past2_pred = if_else(!is.na(vote_2019_pred), vote_2019_pred, vote_2017_pred))
+ukls_filter <- ukls_filter %>%
+  mutate(voted_past2_predf = if_else(voted_past2_pred >= .5, 1, 0))
+
+# Actually writing the full outcome var
+ukls_filter <- ukls_filter %>%
+  mutate(voted_past2p = ifelse(!is.na(ukls_filter$vote_2019), ukls_filter$vote_2019, ukls_filter$voted_past2_predf))
+
+table(ukls_filter$voted_past2p, exclude = NULL)
+hist(ukls_filter$voted_past2p)
+
+```
+## Predicting Voter turnout (imputation model) - Employed
+```{r}
+model_2017imp_emp <- glm(vote_2017 ~ vote_2019 + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_emp_voters)
+model_2019imp_emp <- glm(vote_2019 ~ vote_2017 + age + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_emp_voters)
+
+stargazer(model_2017imp_emp, model_2019imp_emp, type = "text")
+stargazer(model_2017imp_emp, model_2019imp_emp, type = "html", out = "models_votingimp.html")
+```
+
+4. For your regular models, you can then use the imputed turnout variables as outcomes separately or combine them as you suggest (voted either 2017 or 2019 or both). You should still double-check whether the imputed values make sense - for instance, if a person was under age in 2017 it does not make sense to set voted to “yes” - you’d have to manually correct that to “no” then.
+```{r}
+ukls_emp$vote_2019_pred <- predict.glm(model_2019imp_emp, newdata = ukls_emp, type = "response")
+ukls_emp$vote_2017_pred <- predict.glm(model_2017imp_emp, newdata = ukls_emp, type = "response")
+ukls_emp <- ukls_emp %>%
+  mutate(voted_past2_pred = if_else(!is.na(vote_2019_pred), vote_2019_pred, vote_2017_pred))
+ukls_emp <- ukls_emp %>%
+  mutate(voted_past2_predf = if_else(voted_past2_pred >= .5, 1, 0))
+
+# Actually writing the full outcome var
+ukls_emp <- ukls_emp %>%
+  mutate(voted_past2p = ifelse(!is.na(ukls_emp$vote_2019), ukls_emp$vote_2019, ukls_emp$voted_past2_predf))
+
+table(ukls_emp$voted_past2p, exclude = NULL)
+hist(ukls_emp$voted_past2p)
+
+```

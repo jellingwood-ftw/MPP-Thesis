@@ -1,0 +1,527 @@
+---
+title: "UK_setup"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+# Package libraries
+library(tidyverse)
+library(janitor)
+library(readr)
+library(ggplot2)
+library(haven)
+library(stargazer)
+library(VIM)
+library(purrr)
+library(knitr)
+library(kableExtra)
+library(gmodels)
+library(data.table)
+library(forcats)
+library(dotwhisker) # for coef plots
+library(sandwich) # for robust SEs
+library(lmtest) # for robust SEs
+library(infer)
+library(magrittr)
+library(estimatr)
+library(viridis)
+library(emmeans)
+library(corrr)
+library(gridExtra)
+library(qwraps2)
+library(dplyr)
+library(modelsummary)
+library(tibble)
+```
+
+### Loading Data ###
+```{r}
+# UKLS Data
+ukls2020 <- haven::read_dta("k_indresp.dta")
+ukls2020hh <- haven::read_dta("k_hhresp.dta")
+ukls2020ind <- haven::read_dta("k_indall.dta")
+ukls2020indresp <- haven::read_dta("k_indresp.dta")
+
+# gelist 1-5 #
+# 1	Carried passengers in your vehicle (e.g. taxi rides)
+# 2	Delivered food and drink from restaurants and food outlets to people
+# 3	Provided courier services (e.g. package and postal deliveries, messenger services, etc.)
+# 4	Performed manual tasks (e.g. cleaning, decorating, building, home fixtures and repairs, 
+#   pet-sitting, etc.)
+# 5	Performed non-manual tasks (e.g. web and software development, writing and translation, 
+#   accounting, legal and admin services, marketing and media, audio and visual services, etc.)
+```
+
+### Selecting relevant vars ###
+```{r}
+ukls_filter <- ukls2020 %>%
+  select(pidp, k_hidp,  k_gelist1, k_gelist2, k_gelist3, k_gelist4, k_gelist5, k_gehrs, 
+         k_gehrsp, k_geearn, k_geearnp, #gigwork
+         k_employ, k_jbhrs, k_jbot, k_j2has, k_jbterm1, k_jbsemp, k_finnow,#job hours and income
+         k_vote1, k_vote6, k_scwhorupol, k_colbens5, k_votetxspnd, #voting
+         k_hiqual_dv, k_sex, k_dvage, k_racel, k_nchunder16, 
+         k_health, k_urban_dv, k_jbstat, k_ukborn) #controls
+
+ukls_household <- ukls2020hh %>%
+  select(k_hidp, k_fihhmngrs_dv) 
+ukls_household <- ukls_household %>%
+  dplyr::rename(hhinc_month = k_fihhmngrs_dv)
+
+
+```
+
+#### Recoding - Missing, Renaming, Cats, etc ####
+```{r}
+#political interest - pol_int dummy = 1 (high/medium interest) 
+ukls_filter$k_vote6[ukls_filter$k_vote6 < 0] <- NA
+ukls_filter <- ukls_filter %>% 
+  mutate(pol_int = ifelse(ukls_filter$k_vote6 < 3, 1, 0))
+ukls_filter <- ukls_filter %>% 
+  mutate(pol_intv = if_else(pol_int == 1, "High interest", "Low interest"))
+ukls_filter$k_vote6 <- factor(ukls_filter$k_vote6)
+ukls_filter <- ukls_filter %>%
+  mutate(k_vote6 = fct_rev(k_vote6))
+
+table(ukls_filter$pol_int)
+
+# supporting Brexit, tax + spending pref
+table(ukls_filter$k_colbens5)
+ukls_filter$k_colbens5[ukls_filter$k_colbens5 < 0] <- NA
+ukls_filter$k_votetxspnd[ukls_filter$k_votetxspnd < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  rename(brex_support = k_colbens5, tax_support = k_votetxspnd)
+
+#political identity important
+table(ukls_filter$k_scwhorupol)
+ukls_filter$k_scwhorupol[ukls_filter$k_scwhorupol < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  rename(polid_imp = k_scwhorupol)
+
+#gighours
+ukls_filter$k_gehrs[ukls_filter$k_gehrs < 0] <- 0
+table(ukls_filter$k_gehrs)
+#gigdummy
+ukls_filter <- ukls_filter %>%
+  mutate(gig_dummy = ifelse(ukls_filter$k_gehrs > 0, 1, 0))
+ukls_filter <- ukls_filter %>%
+  mutate(gig_dummyv = if_else(gig_dummy == 1, "Gig worker", "Non gig worker"))
+ukls_filter$gig_dummyv <- factor(ukls_filter$gig_dummyv, levels = c("Non gig worker", "Gig worker"))
+table(ukls_filter$gig_dummy)
+# gighours cat
+## first grabbing the period of hours worked
+table(ukls_filter$k_gehrsp)
+ukls_filter$k_gehrsp[ukls_filter$k_gehrsp < 0] <- 0
+# 1	Week
+# 2	Fortnight
+# 3	Four weeks
+# 4	Calendar month
+# 5	Something_else
+ukls_filter <- ukls_filter %>%
+  mutate(gighrs_month = if_else(k_gehrsp == 1, k_gehrs*4, 
+         if_else(k_gehrsp == 2, k_gehrs*2, k_gehrs)))
+ukls_filter <- ukls_filter %>%
+  mutate(gighrs_week = gighrs_month/4)
+ukls_filter$gig_cat <- cut(ukls_filter$gighrs_month,
+                       breaks=c(-1,.1, 5, 20, 40, 80, 281),
+                       labels=c('None','Less than 5', '5-20', '21-40', '40-80','80+'))
+
+# gig_rely (> 20 hrs/month)
+ukls_filter <- ukls_filter %>%
+  mutate(gig_rely = if_else(gighrs_month > 20, 1, 0),
+         gig_cas = if_else(gighrs_month <= 20 & gighrs_month > 0, 1, 0))
+
+# gig software programming, writing, etc (k_gehrs5)
+table(ukls_filter$k_gelist5)
+ukls_filter$k_gelist5[ukls_filter$k_gelist5 < 0] <- 0
+ukls_filter <- ukls_filter %>%
+  mutate(gig_nonman = if_else(ukls_filter$k_gelist5 > 0, 1, 0))
+ukls_filter <- ukls_filter %>%
+  mutate(gig_man = if_else(gig_dummy==1 & gig_nonman == 0, 1, 0))
+
+# Work hours
+ukls_filter$k_jbhrs[ukls_filter$k_jbhrs < 0] <- NA
+ukls_filter$k_jbot[ukls_filter$k_jbot < 0] <- NA
+ukls_filter$k_j2has[ukls_filter$k_j2has < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(k_j2has = if_else(k_j2has == 2, 0, 1)) 
+ukls_filter <- rename(ukls_filter, sec_job = k_j2has)
+ukls_filter <- ukls_filter %>%
+  mutate(sec_jobv = if_else(sec_job ==1, "Second job", "No second job"))
+ukls_filter <- ukls_filter %>%
+  rename(main_hrs = k_jbhrs, ot_hrs = k_jbot)
+ukls_filter <- mutate(ukls_filter, tot_hrs = main_hrs + ot_hrs)
+ukls_filter <- ukls_filter %>%
+  mutate(tot_hrs = if_else(sec_job==1, tot_hrs + gighrs_week, tot_hrs))
+
+# permanent contract
+table(ukls_filter$k_jbterm1)
+ukls_filter$k_jbterm1[ukls_filter$k_jbterm1 < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(perm_job = if_else(k_jbterm1 == 1, 1, 0))
+table(ukls_filter$perm_job)
+
+#education: 2 = Higher Ed, 1 = High School/Other Qualification, 0 = No qual
+ukls_filter$k_hiqual_dv[ukls_filter$k_hiqual_dv < 0] <- NA
+ukls_filter$k_hiqual_dv[ukls_filter$k_hiqual_dv == 9] <- 6
+ukls_filter <- ukls_filter %>%
+  mutate(edu = if_else(ukls_filter$k_hiqual_dv > 5, "No qual", 
+         if_else(ukls_filter$k_hiqual_dv > 2, "High school", "Higher ed")))
+ukls_filter$edu <- factor(ukls_filter$edu, 
+                             levels = c("No qual", "High school", "Higher ed"))
+table(ukls_filter$edu)
+#financial difficulty
+table(ukls_filter$k_finnow)
+ukls_filter$k_finnow[ukls_filter$k_finnow < 0] <- NA
+#fin_dif dummy (1 = finding it quite/very difficult)
+ukls_filter <- ukls_filter %>%
+  mutate(fin_dif = ifelse(ukls_filter$k_finnow > 3, 1, 0))
+ukls_filter <- ukls_filter %>%
+  mutate(fin_difv = if_else(fin_dif ==1, "Fin Diff", "No fin diff"))
+
+# sex 
+# Recoded to M = 1, F = 0
+table(ukls_filter$k_sex)
+ukls_filter$k_sex[ukls_filter$k_sex == 2] <- 0
+ukls_filter$k_sex[ukls_filter$k_sex == -2] <- 0
+ukls_filter <- ukls_filter %>%
+  rename(sex=k_sex)
+ukls_filter <- ukls_filter %>%
+  mutate(sexv = if_else(sex ==1, "Male", "Female"))
+
+# num children
+table(ukls_filter$k_nchunder16)
+ukls_filter$k_nchunder16[ukls_filter$k_nchunder16 < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(child_dummy = ifelse(ukls_filter$k_nchunder16 > 0, 1, 0))
+ukls_filter <- ukls_filter %>%
+  mutate(child_dummyv = if_else(child_dummy == 1, "Has child/ren", "No children"))
+
+# health - recoded to 1 = illness/impairment, 0 = healthy, renamed health_bad
+table(ukls_filter$health_bad)
+ukls_filter$k_health[ukls_filter$k_health < 0] <- NA
+ukls_filter$k_health[ukls_filter$k_health == 2] <- 0
+ukls_filter <- rename(ukls_filter, health_bad = k_health)
+
+# urban/rural - 
+table(ukls_filter$k_urban_dv)
+ukls_filter$k_urban_dv[ukls_filter$k_urban_dv < 0] <- NA
+ukls_filter$k_urban_dv[ukls_filter$k_urban_dv == 2] <- 0
+
+# student status
+table(ukls_filter$stu)
+ukls_filter$k_jbstat[ukls_filter$k_jbstat < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(stu = if_else(k_jbstat == 7, 1, 0))
+
+# self-employment
+ukls_filter <- ukls_filter %>%
+  mutate(self_emp = if_else(k_jbstat == 1, 1, 0))
+ukls_filter <- ukls_filter %>%
+  mutate(self_empv = if_else(self_emp == 1, "Self-emp", "Not self-emp"))
+
+# age
+ukls_filter <- rename(ukls_filter, age = k_dvage)
+ukls_filter$age[ukls_filter$age < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(under_26 = if_else(age < 26, 1, 0)) 
+ukls_filter <- ukls_filter %>%
+  mutate(under_26v = if_else(age < 26, "Under 26", "26 or older")) 
+
+# employment binary 
+ukls_filter$k_employ[ukls_filter$k_employ < 0] <- NA
+ukls_filter <- ukls_filter %>%
+  mutate(employed = if_else(k_employ == 2, 0, 1))
+
+# Joins
+
+#foreign born
+ukls_born <- read_rds("ukls_born_long.rds")
+ukls_filter <- left_join(ukls_filter, ukls_born)
+table(ukls_filter$born_for)
+ukls_filter <- ukls_filter %>%
+  mutate(born_forv = if_else(born_for ==1, "Migrant", "Non Migrant"))
+
+#Voting
+ukls_vote_wide <- read_rds("ukls_vote_wide.rds")
+ukls_filter <- left_join(ukls_filter, ukls_vote_wide)
+
+#Household income
+ukls_filter <- left_join(ukls_filter, ukls_household)
+ukls_filter <- ukls_filter %>%
+  mutate(hhinc_st = scale(hhinc_month))
+
+# combining 2019 and 2017 voting records
+ukls_filter <- ukls_filter %>%
+  mutate(voted_past2 = if_else(!is.na(vote_2019), vote_2019, vote_2017)) %>%
+  mutate(cantvote_past2 = if_else(!is.na(cant_vote_2019), cant_vote_2019, cant_vote_2017))
+
+ukls_filter <- ukls_filter %>%
+  mutate(cantvote_past2v = if_else(cantvote_past2 == 1, "Cannot Vote", "Can Vote"))
+```
+
+## Creating filtered dataset, just employed persons
+```{r}
+ukls_emp <- ukls_filter %>%
+  mutate(employed = if_else(gig_dummy==1, 1, 
+                            if_else(employed == 1, 1, 0)))
+
+ukls_filter %>%
+  filter(k_employ == 2 & gig_dummy == 1) %>%
+  ggplot2::ggplot(aes(x = k_gehrs)) + 
+  geom_histogram(bins = 15)+
+  theme_minimal()
+
+ukls_filter %>%
+  filter(k_employ == 2 & gig_dummy == 1) %>%
+  summarise(mean = mean(k_gehrs))
+
+```
+
+```{r}
+## Pulling in imputed voting from separate script (voted_past2p)
+source("02_Voting_impute.Rmd")
+
+ukls_filter <- ukls_filter %>%
+  mutate(voted_past2pv = if_else(voted_past2p ==1, "Voted", "Not voted"))
+table(ukls_filter$voted_past2v)
+
+# Important NA outcome vars
+ukls_filter <- ukls_filter %>%
+  mutate(missing_polint = if_else(is.na(pol_int), 1, 0)) %>%
+  mutate(missing_vote2019 = if_else(is.na(vote_2019), 1, 0)) %>%
+  mutate(missing_votepast2p = if_else(is.na(voted_past2p), 1, 0)) %>%
+  mutate(missing_born_for = if_else(is.na(born_for), 1, 0)) %>%
+  mutate(missing_perm_job = if_else(is.na(perm_job), 1, 0)) %>%
+  mutate(missing_sec_job = if_else(is.na(sec_job), 1, 0)) %>%
+  mutate(missing_self_emp = if_else(is.na(self_emp), 1, 0)) %>%
+  mutate(missing_vote2017 = if_else(is.na(vote_2017), 1, 0)) %>%
+  mutate(missing_cantvote = if_else(is.na(cantvote_past2), 1, 0))
+
+ukls_voters%>%
+  filter(gig_dummy==1) %>%
+  count(missing_born_for, missing_polint)
+
+ukls_emp <- ukls_emp %>%
+  mutate(voted_past2pv = if_else(voted_past2p ==1, "Voted", "Not voted"))
+
+
+# Important NA outcome vars - employed
+ukls_emp <- ukls_emp %>%
+  mutate(missing_polint = if_else(is.na(pol_int), 1, 0)) %>%
+  mutate(missing_vote2019 = if_else(is.na(vote_2019), 1, 0)) %>%
+  mutate(missing_votepast2p = if_else(is.na(voted_past2p), 1, 0)) %>%
+  mutate(missing_born_for = if_else(is.na(born_for), 1, 0)) %>%
+  mutate(missing_perm_job = if_else(is.na(perm_job), 1, 0)) %>%
+  mutate(missing_sec_job = if_else(is.na(sec_job), 1, 0)) %>%
+  mutate(missing_self_emp = if_else(is.na(self_emp), 1, 0)) %>%
+  mutate(missing_vote2017 = if_else(is.na(vote_2017), 1, 0))
+
+
+```
+
+### Stratified dataframes ###
+```{r}
+# Gender
+ukls_m <- ukls_filter %>%
+  filter(sex == 1)
+ukls_fm <- ukls_filter %>%
+  filter(sex == 0)
+
+# Gender - Employed
+ukls_emp_m <- ukls_emp %>%
+  filter(sex == 1)
+ukls_emp_fm <- ukls_emp %>%
+  filter(sex == 0)
+
+# can't vote filtered out
+ukls_voters <- ukls_filter %>%
+  filter(cantvote_past2!=1)
+
+
+# can't vote filtered out - employed
+ukls_emp_voters <- ukls_emp %>%
+  filter(cantvote_past2==0)
+ukls_emp_voters_m <- ukls_emp_m %>%
+  filter(cantvote_past2==0)
+ukls_emp_voters_fm <- ukls_emp_fm %>%
+  filter(cantvote_past2==0)
+
+# gig_rely filtered out
+ukls_gigcas <- ukls_filter %>%
+  filter(gig_rely==0)
+
+#gig_nonman filtered out
+ukls_gignonman <- ukls_filter %>%
+  filter(gig_nonman==0)
+ukls_gignonman_m <- ukls_m %>%
+  filter(gig_nonman==0)
+ukls_gignonman_fm <- ukls_fm %>%
+  filter(gig_nonman==0)
+
+```
+
+### Selecting final vars ###
+```{r}
+ukls_final <- ukls_filter %>%
+  select(pidp, gig_dummy, gighrs_month, gighrs_week, gig_cat, gig_rely, gig_cas, gig_nonman, gig_man, 
+         main_hrs, ot_hrs, tot_hrs, sec_job, perm_job, self_emp, fin_dif, polid_imp, pol_int, k_vote6, 
+         brex_support, tax_support, k_hiqual_dv, edu, sex, age, under_26, stu, k_nchunder16, child_dummy, 
+         uk_born, born_for, vote_2010, vote_2015, vote_2017, vote_2019, voted_past2p,
+         cant_vote_2019, cant_vote_2017, cantvote_past2, health_bad, k_urban_dv, hhinc_month, hhinc_st,
+         missing_polint, missing_vote2019, missing_vote2017, missing_votepast2p, missing_born_for, 
+         missing_perm_job, missing_sec_job, missing_self_emp, missing_cantvote,
+         pol_intv, voted_past2pv, sexv, under_26v, child_dummyv, sec_jobv, gig_dummyv, self_empv, fin_difv)
+
+saveRDS(ukls_final, file = "final_data.rds")
+
+ukls_final_emp <- ukls_emp %>%
+  select(pidp, gig_dummy, gighrs_month, gighrs_week, gig_cat, gig_rely, gig_cas, gig_nonman, gig_man, 
+         main_hrs, ot_hrs, tot_hrs, sec_job, perm_job, self_emp, fin_dif, polid_imp, pol_int, k_vote6, 
+         brex_support, tax_support, k_hiqual_dv, edu, sex, age, under_26, stu, k_nchunder16, child_dummy, 
+         uk_born, born_for, vote_2010, vote_2015, vote_2017, vote_2019, voted_past2p,
+         cant_vote_2019, cant_vote_2017, cantvote_past2, health_bad, k_urban_dv, hhinc_month, hhinc_st,
+         missing_polint, missing_vote2019, missing_vote2017, missing_votepast2p, missing_born_for, 
+         missing_perm_job, missing_sec_job, missing_self_emp, 
+         pol_intv, voted_past2pv, sexv, under_26v, child_dummyv, sec_jobv, gig_dummyv, self_empv, fin_difv)
+
+saveRDS(ukls_final_emp, file = "final_data_emp.rds")
+
+```
+
+### Cross-Wave Data: Voting and Born in UK ###
+```{r}
+# Grabbing voting history and born in UK variables across all waves
+ukls_a <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/a_indresp.dta")
+ukls_ab <- select(ukls_a, pidp, a_ukborn)
+ukls_b <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/b_indresp.dta")
+ukls_bb <- select(ukls_b, pidp, b_ukborn)
+ukls_bv <- select(ukls_b, pidp, b_vote7)
+ukls_c <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/c_indresp.dta")
+ukls_cb <- select(ukls_c, pidp, c_ukborn)
+ukls_d <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/d_indresp.dta")
+ukls_db <- select(ukls_d, pidp, d_ukborn)
+ukls_e <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/e_indresp.dta")
+ukls_eb <- select(ukls_e, pidp, e_ukborn)
+ukls_f <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/f_indresp.dta")
+ukls_fb <- select(ukls_f, pidp, f_ukborn)
+ukls_g <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/g_indresp.dta")
+ukls_gb <- select(ukls_g, pidp, g_ukborn)
+ukls_gv <- select(ukls_g, pidp, g_vote7)
+ukls_h <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/h_indresp.dta")
+ukls_hb <- select(ukls_h, pidp, h_ukborn)
+ukls_hv <- select(ukls_h, pidp, h_vote7)
+ukls_i <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/i_indresp.dta")
+ukls_ib <- select(ukls_i, pidp, i_ukborn)
+ukls_iv <- select(ukls_i, pidp, i_vote7)
+ukls_j <- haven::read_dta("~/Documents/GitHub/Thesis/UKDA-6614-stata/stata/stata13_se/ukhls/j_indresp.dta")
+ukls_jb <- select(ukls_j, pidp, j_ukborn)
+ukls_jv <- select(ukls_j, pidp, j_vote7)
+ukls_kb <- select(ukls_filter, pidp, k_ukborn)
+ukls_kv <- select(ukls_filter, pidp, k_vote7)
+
+# Joining up the UK vote dataframes
+ukls_vote <- full_join(ukls_bv, ukls_gv)
+ukls_vote <- full_join(ukls_vote, ukls_hv)
+ukls_vote <- full_join(ukls_vote, ukls_iv)
+ukls_vote <- full_join(ukls_vote, ukls_jv)
+ukls_vote <- full_join(ukls_vote, ukls_kv)
+
+# Recode NAs
+ukls_vote$b_vote7[ukls_vote$b_vote7 < 0] <- NA
+ukls_vote$g_vote7[ukls_vote$g_vote7 < 0] <- NA
+ukls_vote$h_vote7[ukls_vote$h_vote7 < 0] <- NA
+ukls_vote$i_vote7[ukls_vote$i_vote7 < 0] <- NA
+ukls_vote$j_vote7[ukls_vote$j_vote7 < 0] <- NA
+ukls_vote$k_vote7[ukls_vote$k_vote7 < 0] <- NA
+
+ukls_vote %>%
+  select(cant_vote_2019, cant_vote_2017) %>%
+  VIM::aggr(numbers = T)
+
+
+ukls_vote[is.na(ukls_vote)] = 0
+
+ukls_vote <- ukls_vote %>%
+  mutate(vote_2015 = g_vote7 + h_vote7)
+ukls_vote <- ukls_vote %>%
+  mutate(vote_2017 = i_vote7 + j_vote7)
+
+ukls_vote <- ukls_vote %>%
+  rename(vote_2010 = b_vote7) %>%
+  rename(vote_2019 = k_vote7)
+
+ukls_vote <- ukls_vote %>%
+  select(pidp, vote_2010, vote_2015, vote_2017, vote_2019)
+
+ukls_vote[ukls_vote== 0] <- NA
+
+table(ukls_vote$cant_vote_2017)
+
+ukls_vote <- ukls_vote %>% 
+  mutate(cant_vote_2019 = ifelse(vote_2019 > 2, 1, 0)) %>%
+  mutate(vote_2019 = ifelse(vote_2019 < 2, 1, 0)) %>%
+  mutate(cant_vote_2017 = ifelse(vote_2017 > 2, 1, 0)) %>%
+  mutate(vote_2017 = ifelse(ukls_vote$vote_2017 < 2, 1, 0)) %>%
+  mutate(vote_2015 = ifelse(ukls_vote$vote_2015 < 2, 1, 0)) %>%
+  mutate(vote_2010 = ifelse(ukls_vote$vote_2010 < 2, 1, 0)) 
+
+
+saveRDS(ukls_vote, file = "ukls_vote_wide.rds")
+
+# Joining up the UK Born dataframes
+ukls_born <- full_join(ukls_bb, ukls_ab)
+ukls_born <- full_join(ukls_cb, ukls_born)
+ukls_born <- full_join(ukls_db, ukls_born)
+ukls_born <- full_join(ukls_eb, ukls_born)
+ukls_born <- full_join(ukls_fb, ukls_born)
+ukls_born <- full_join(ukls_gb, ukls_born)
+ukls_born <- full_join(ukls_hb, ukls_born)
+ukls_born <- full_join(ukls_ib, ukls_born)
+ukls_born <- full_join(ukls_jb, ukls_born)
+ukls_born <- full_join(ukls_kb, ukls_born)
+
+table(ukls_born$b_ukborn)
+table(ukls_born$a_ukborn)
+
+ukls_born_long <- data.table::melt(setDT(ukls_born), id.vars = "pidp", 
+                                   variable.name = "born_uk")
+ukls_born_long <- na.omit(ukls_born_long) %>%
+  filter(value > -1) %>%
+  select(pidp, value) %>%
+  distinct() %>%
+  rename(uk_born = value)
+
+saveRDS(ukls_born_long, file = "ukls_born_long.rds")
+
+
+
+# Grab voting record
+ukls_born_long <- ukls_born_long %>%
+  mutate(born_for = if_else(uk_born==5, 1, 0))
+
+
+ukls_voted_long <- data.table::melt(setDT(ukls_voted), id.vars = "pidp", 
+                                   variable.name = "year_voted")
+ukls_voted_long <- na.omit(ukls_voted_long) %>%
+  filter(value > -1)
+ukls_vothist <- data.table::dcast(ukls_voted_long, pidp ~ year_voted, value.var = "value")
+## Where does b_voted7 go?
+
+
+
+```
+
+## Checking out survey completion type (k_indall)
+```{r}
+ukls_indfilter <- ukls2020ind %>%
+  select(pidp, k_modetype)
+ukls_indresp_f <- ukls2020indresp %>%
+  select(pidp, k_scac)
+ukls_mode <- full_join(ukls_indfilter, ukls_indresp_f)
+
+```
+

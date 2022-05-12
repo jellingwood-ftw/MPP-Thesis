@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+cs-transfer
+k_indresp.dta
+k_hhresp.dta
+UKDA-6614-stata
+.RDataTmp
+k_indall.dta
+data/

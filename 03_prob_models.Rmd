@@ -1,0 +1,592 @@
+---
+title: "UK_prob_modeling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Modeling #####
+
+## Political Interest ##
+```{r}
+
+####################################
+##### By-Covariate Type Analysis ###
+####################################
+
+## Naive models
+modelpi_naive <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"), data = ukls_final)
+modelpi_naive_nm <- glm(pol_int ~ gig_nonman, family = binomial(link = "probit"), data = ukls_final)
+modelpi_naive_m <- glm(pol_int ~ gig_man, family = binomial(link = "probit"), data = ukls_final)
+modelpi_naive_r <- glm(pol_int ~ gig_rely, family = binomial(link = "probit"), data = ukls_final)
+modelpi_naive_c <- glm(pol_int ~ gig_cas, family = binomial(link = "probit"), data = ukls_final)
+modelpi_naive_male <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"), data = ukls_m)
+modelpi_naive_female <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"), data = ukls_fm)
+modelpi_naive_male_nm <- glm(pol_int ~ gig_nonman, family = binomial(link = "probit"), data = ukls_m)
+modelpi_naive_female_nm <- glm(pol_int ~ gig_nonman, family = binomial(link = "probit"), data = ukls_fm)
+modelpi_naive_male_m <- glm(pol_int ~ gig_man, family = binomial(link = "probit"), 
+                            data = ukls_m)
+modelpi_naive_female_m <- glm(pol_int ~ gig_man, family = binomial(link = "probit"), 
+                              data = ukls_fm)
+
+stargazer(modelpi_naive, modelpi_naive_c, modelpi_naive_r, modelpi_naive_nm, modelpi_naive_m,
+          type = "html",
+          dep.var.labels = "Political Interest",
+          title = "Naive Maximum Likelihood Estimates of Political Interest on Gig Work",
+          covariate.labels = c("Gig work - all", "Casual","Rely on gig work", "Non-manual gig work", "Manual gig work"),
+          out = "models_naive_polint.html")
+
+### All gig work ###
+
+## Political interest - SE predictors
+modelpi_SE <- glm(pol_int ~ gig_dummy + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Precariousness
+modelpi_PR <- glm(pol_int ~ gig_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Citizenship/inclusion
+modelpi_CB <- glm(pol_int ~ gig_dummy + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+## Combinations
+modelpi_SEPR <- glm(pol_int ~ gig_dummy + under_26 + sex + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelpi_PRCB <- glm(pol_int ~ gig_dummy + hhinc_st + sec_job + self_emp + fin_dif + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_SECB <- glm(pol_int ~ gig_dummy + under_26 + sex + edu + child_dummy + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_all <- glm(pol_int ~ gig_dummy + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+### Table Outputs
+stargazer(modelpi_naive, modelpi_SE, modelpi_PR, modelpi_CB, modelpi_SEPR, modelpi_PRCB, modelpi_SECB, modelpi_all, type = "text")
+stargazer(modelpi_naive, modelpi_SE, modelpi_PR, modelpi_CB, modelpi_SEPR, modelpi_PRCB, modelpi_SECB, modelpi_all, type = "html", out = "models_polintXgigwork_all.html", 
+          title = "Maximum Likelihood Estimates of Political Interest on Gig Work",
+          dep.var.labels = "Political Interest",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                            "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Gig work", "Under Age 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+
+### gig_nonman as IV ###
+
+## Political interest - SE predictors
+modelpi_SEnm <- glm(pol_int ~ gig_nonman + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Precariousness
+modelpi_PRnm <- glm(pol_int ~ gig_nonman + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Citizenship/inclusion
+modelpi_CBnm <- glm(pol_int ~ gig_nonman + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+## Combinations
+modelpi_SEPRnm <- glm(pol_int ~ gig_nonman + under_26 + sex + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelpi_PRCBnm <- glm(pol_int ~ gig_nonman + hhinc_st + sec_job + self_emp + fin_dif + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_SECBnm <- glm(pol_int ~ gig_nonman + under_26 + sex + edu + child_dummy + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_allnm <- glm(pol_int ~ gig_nonman + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+stargazer(modelpi_naive_nm, modelpi_SEnm, modelpi_PRnm, modelpi_CBnm, modelpi_SEPRnm, modelpi_PRCBnm, 
+          modelpi_SECBnm, modelpi_allnm, 
+          type = "html",
+          title = "Maximum Likelihood Estimates of Political Interest on Non-Manual Gig Work",
+          out = "models_polintxgig_nonman.html",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                            "Pr. + Inc.", "SE + Inc.", "All"),
+          dep.var.labels = "Political Interest", 
+          covariate.labels = c("Nonmanual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+
+### gig_man as IV ###
+
+## Political interest - SE predictors
+modelpi_SEm <- glm(pol_int ~ gig_man + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Precariousness
+modelpi_PRm <- glm(pol_int ~ gig_man + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Citizenship/inclusion
+modelpi_CBm <- glm(pol_int ~ gig_man + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+## Combinations
+modelpi_SEPRm <- glm(pol_int ~ gig_man + under_26 + sex + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelpi_PRCBm <- glm(pol_int ~ gig_man + hhinc_st + sec_job + self_emp + fin_dif + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_SECBm <- glm(pol_int ~ gig_man + under_26 + sex + edu + child_dummy + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_allm <- glm(pol_int ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+stargazer(modelpi_naive_m, modelpi_SEm, modelpi_PRm, modelpi_CBm, modelpi_SEPRm, modelpi_PRCBm, 
+          modelpi_SECBm, modelpi_allm, type = "text")
+stargazer(modelpi_naive_m, modelpi_SEm, modelpi_PRm, modelpi_CBm, modelpi_SEPRm, modelpi_PRCBm, 
+          modelpi_SECBm, modelpi_allm, 
+          type = "html",
+          title = "Maximum Likelihood Estimates of Political Interest on Manual Gig Work",
+          out = "models_polintxgig_man.html",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                            "Pr. + Inc.", "SE + Inc.", "All"),
+          dep.var.labels = "Political Interest", 
+          covariate.labels = c("Manual gig work", "Age", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+
+### gig_rely as IV ###
+
+## Political interest - SE predictors
+modelpi_SEr <- glm(pol_int ~ gig_rely + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Precariousness
+modelpi_PRr <- glm(pol_int ~ gig_rely + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Citizenship/inclusion
+modelpi_CBr <- glm(pol_int ~ gig_rely + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+## Combinations
+modelpi_SEPRr <- glm(pol_int ~ gig_rely + under_26 + sex + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelpi_PRCBr <- glm(pol_int ~ gig_rely + hhinc_st + sec_job + self_emp + fin_dif + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_SECBr <- glm(pol_int ~ gig_rely + under_26 + sex + edu + child_dummy + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelpi_allr <- glm(pol_int ~ gig_rely + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+modelpi_naive_r <- glm(pol_int ~ gig_rely, family = binomial(link = "probit"), data = ukls_final)
+
+stargazer(modelpi_naive_r, modelpi_SEr, modelpi_PRr, modelpi_CBr, modelpi_SEPRr, modelpi_PRCBr, 
+          modelpi_SECBr, modelpi_allr, type = "text")
+stargazer(modelpi_naive_r, modelpi_SEr, modelpi_PRr, modelpi_CBr, modelpi_SEPRr, modelpi_PRCBr, 
+          modelpi_SECBr, modelpi_allr, 
+          type = "html",
+          title = "Maximum Likelihood Estimates of Political Interest on Gig Work Reliance",
+          out = "models_polintxgig_rely.html",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                            "Pr. + Inc.", "SE + Inc.", "All"),
+          dep.var.labels = "Political Interest", 
+          covariate.labels = c("Gig work, rely", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+### gig_cas as IV ###
+
+## Political interest - SE predictors
+modelpi_SEc <- glm(pol_int ~ gig_cas + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Precariousness
+modelpi_PRc <- glm(pol_int ~ gig_cas + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_final)
+
+## Political interest - Citizenship/inclusion
+modelpi_CBc <- glm(pol_int ~ gig_cas + cantvote_past2 + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+
+## Combining Manual and Non-Manual x Political Interest output
+stargazer(modelpi_naive_m, modelpi_SEm, modelpi_PRm, modelpi_CBm,
+          modelpi_naive_nm, modelpi_SEnm, modelpi_PRnm, modelpi_CBnm, 
+          type = "html",
+          title = "Maximum Likelihood Estimates of Political Interest on Gig Work - Manual and Non Manual",
+          out = "models_polintxgig_man_non.html",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", 
+                            "Naive", "Socioeconomic", "Precarious", "Inclusion"),
+          dep.var.labels = "Political Interest", 
+          order = c(1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+          covariate.labels = c("Gig work, Manual", "Gig work, Non Manual", "Under 26", "Sex (1 = M)", 
+                               "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+
+
+## Combining Rely and Casual x Political Interest output
+stargazer(modelpi_naive_r, modelpi_SEr, modelpi_PRr, modelpi_CBr,
+          modelpi_naive_c, modelpi_SEc, modelpi_PRc, modelpi_CBc, 
+          type = "html",
+          title = "Maximum Likelihood Estimates of Political Interest on Gig Work - Rely and Casual",
+          out = "models_polintxgigsub_r_c.html",
+          column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", 
+                            "Naive", "Socioeconomic", "Precarious", "Inclusion"),
+          dep.var.labels = "Political Interest", 
+          covariate.labels = c("Gig work, Rely", "Gig work, Casual", "Under 26", "Sex (1 = M)", 
+                               "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", "St HH Income", "Can't vote",
+                              "Migrant status"))
+
+```
+
+## Voting ##
+```{r}
+## Naive models
+modelv_naive <- glm(voted_past2p ~ gig_dummy, family = binomial(link = "probit"), data = ukls_voters)
+modelv_naive_nm <- glm(voted_past2p ~ gig_nonman, family = binomial(link = "probit"), data = ukls_voters)
+modelv_naive_m <- glm(voted_past2p ~ gig_man, family = binomial(link = "probit"), data = ukls_voters)
+modelv_naive_r <- glm(voted_past2p ~ gig_rely, family = binomial(link = "probit"), data = ukls_voters)
+modelv_naive_c <- glm(voted_past2p ~ gig_cas, family = binomial(link = "probit"), data = ukls_voters)
+
+modelv_naive_male <- glm(voted_past2p ~ gig_dummy, family = binomial(link = "probit"), data = ukls_voters_m)
+modelv_naive_female <- glm(voted_past2p ~ gig_dummy, family = binomial(link = "probit"), data = ukls_voters_fm)
+modelv_naive_male_nm <- glm(voted_past2p ~ gig_nonman, family = binomial(link = "probit"), data = ukls_voters_m)
+modelv_naive_female_nm <- glm(voted_past2p ~ gig_nonman, family = binomial(link = "probit"), data = ukls_voters_fm)
+modelv_naive_male_m <- glm(voted_past2p ~ gig_man, family = binomial(link = "probit"), 
+                            data = ukls_voters_m)
+modelv_naive_female_m <- glm(voted_past2p ~ gig_man, family = binomial(link = "probit"), 
+                              data = ukls_voters_fm)
+
+# With Gender models
+stargazer(modelv_naive, modelv_naive_nm, modelv_naive_m, modelv_naive_male, modelv_naive_male_nm, 
+          modelv_naive_male_m, modelv_naive_female, modelv_naive_female_nm, modelv_naive_female_m,
+          type = "html",
+          column.separate = c(3, 3, 3),
+          column.labels = c("All Gig Workers", "Men", "Women"),
+          dep.var.labels = "Voted",
+          title = "Naive Maximum Likelihood Estimates of Voting on Gig Work and Non-Manual Gig Work",
+          covariate.labels = c("Gig work", "Non-manual gig work", "Manual gig work"),
+          out = "models_naive_voting_gender.html",
+          notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+# Without gender
+stargazer(modelv_naive, modelv_naive_c, modelv_naive_r, modelv_naive_nm, modelv_naive_m, 
+          type = "html",
+          #column.labels = c("All Gig Workers", "Non-Manual Gig Workers", "Manual Gig Workers"),
+          dep.var.labels = "Voted",
+          title = "Naive Maximum Likelihood Estimates of Voting on Gig Work",
+          covariate.labels = c("Gig work - all", "Casual","Rely on gig work", "Non-manual gig work", "Manual gig work"),
+          out = "models_naive_voting.html",
+          notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+modelv_naive_pi <- glm(voted_past2p ~ gig_dummy + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+stargazer(modelv_naive, modelv_naive_pi, type = "text")
+
+### All Gig Work ###
+
+## Voting - SE predictors (+ pol_int)
+modelv_SE <- glm(voted_past2p ~ gig_dummy + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_SEpi <- glm(voted_past2p ~ gig_dummy + under_26 + sex + edu + child_dummy + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - Precariousness (+ pol_int)
+modelv_PR <- glm(voted_past2p ~ gig_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_PRpi <- glm(voted_past2p ~ gig_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Combinations
+modelv_all <- glm(voted_past2p ~ gig_dummy + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpi <- glm(voted_past2p ~ gig_dummy + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpibf <- glm(voted_past2p ~ gig_dummy + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+### Table Outputs
+stargazer(modelv_naive, modelv_SE, modelv_SEpi, modelv_PR, modelv_PRpi, modelv_SEPR, modelv_all, type = "text")
+stargazer(modelv_naive, modelv_SE, modelv_PR, modelv_all, modelv_naive_pi, modelv_SEpi, modelv_PRpi, modelv_allpi, modelv_allpibf, type = "html", out = "models_votingXgigwork_all.html", 
+          title = "Maximum Likelihood Estimates of Voting on Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Political Interest", "Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+### Non Manual Gig Work ###
+modelv_naive_pi_nm <- glm(voted_past2p ~ gig_nonman + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - SE predictors (+ pol_int)
+modelv_SE_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_SEpi_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - Precariousness (+ pol_int)
+modelv_PR_nm <- glm(voted_past2p ~ gig_nonman + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_PRpi_nm <- glm(voted_past2p ~ gig_nonman + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Combinations
+modelv_all_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpi_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allbf_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpibf_nm <- glm(voted_past2p ~ gig_nonman + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+
+### Table Outputs
+stargazer(modelv_naive_nm, modelv_SE_nm, modelv_PR_nm, modelv_all_nm, modelv_naive_pi_nm, modelv_SEpi_nm, modelv_PRpi_nm,  modelv_allpi_nm, modelv_allpibf_nm, type = "html", out = "models_votingXgigwork_nm.html", 
+          title = "Maximum Likelihood Estimates of Voting on Non Manual Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Non manual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Political Interest", "Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+
+### Manual Gig Work ###
+modelv_naive_pi_m <- glm(voted_past2p ~ gig_man + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - SE predictors (+ pol_int)
+modelv_SE_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_SEpi_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - Precariousness (+ pol_int)
+modelv_PR_m <- glm(voted_past2p ~ gig_man + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_PRpi_m <- glm(voted_past2p ~ gig_man + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Combinations
+modelv_all_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allbf_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpi_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allbf_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpibf_m <- glm(voted_past2p ~ gig_man + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+### Table Outputs
+stargazer(modelv_naive_m, modelv_SE_m, modelv_PR_m, modelv_all_m, modelv_naive_pi_m, modelv_SEpi_m, modelv_PRpi_m, modelv_allpi_m, modelv_allpibf_m, type = "html", out = "models_votingXgigwork_m.html", 
+          title = "Maximum Likelihood Estimates of Voting on Manual Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Manual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Political Interest", "Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+## Without PI
+stargazer(modelv_naive_m, modelv_SE_m, modelv_PR_m, modelv_all_m, modelv_allbf_m, type = "html", out = "models_votingXgigwork_m_bf.html", 
+          title = "Maximum Likelihood Estimates of Voting on Manual Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Manual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+### Relying on gig work ###
+modelv_naive_pi_r <- glm(voted_past2p ~ gig_rely + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - SE predictors (+ pol_int)
+modelv_SE_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_SEpi_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Voting - Precariousness (+ pol_int)
+modelv_PR_r <- glm(voted_past2p ~ gig_rely + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_PRpi_r <- glm(voted_past2p ~ gig_rely + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+
+## Combinations
+modelv_all_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpi_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allbf_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpibf_r <- glm(voted_past2p ~ gig_rely + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+### Table Outputs
+stargazer(modelv_naive_r, modelv_SE_r, modelv_PR_r, modelv_all_r, modelv_naive_pi_r, modelv_SEpi_r, modelv_PRpi_r, modelv_allpi_r, modelv_allpibf_r, type = "html", out = "models_votingXgigwork_r.html", 
+          title = "Maximum Likelihood Estimates of Voting on Reliant on Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Rely on gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Political Interest", "Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+## Casual gig work
+modelv_all_c <- glm(voted_past2p ~ gig_cas + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allbf_c <- glm(voted_past2p ~ gig_cas + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_voters)
+modelv_allpibf_c <- glm(voted_past2p ~ gig_cas + under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + pol_int + born_for, family = binomial(link = "probit"), data = ukls_voters)
+
+
+## Table combinations of gig work categories x voting
+
+stargazer(modelv_naive_nm, modelv_SE_nm, modelv_PR_nm, modelv_all_nm, modelv_naive_m, modelv_SE_m, modelv_PR_m, modelv_all_m, type = "html", out = "models_votingXgigwork_nm_m.html", 
+          title = "Maximum Likelihood Estimates of Voting Non manual and Manual Gig Work",
+          dep.var.labels = "Voted",
+          #column.labels = c("Naive", "Socioeconomic", "Precarious", "Inclusion", "SE + Pr.",
+                          #  "Pr. + Inc.", "SE + Inc.", "All"),
+          covariate.labels = c("Non manual gig work", "Manual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+
+stargazer(modelv_allpibf_nm, modelv_allpibf_m, modelv_allpibf_r, modelv_allpibf_c, type = "html", out = "models_votingXgigwork_cat_allall.html", 
+          title = "Maximum Likelihood Estimates of Voting across gig work categories",
+          dep.var.labels = "Voted",
+          covariate.labels = c("Non manual gig work", "Manual gig work", "Rely on gig work", "Casual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Pol int","Migrant Status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+## All covariates across gw categories (for appendix)
+stargazer(modelv_all_nm, modelv_all_m, modelv_all_r, modelv_all_c, type = "html", out = "models_votingXgigwork_cat_all.html", 
+          title = "Maximum Likelihood Estimates of Voting across gig work categories",
+          dep.var.labels = "Voted",
+          covariate.labels = c("Non manual gig work", "Manual gig work", "Rely on gig work", "Casual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+stargazer(modelv_allbf_nm, modelv_allbf_m, modelv_allbf_r, modelv_allbf_c, type = "html", out = "models_votingXgigwork_cat_all_bf.html", 
+          title = "Maximum Likelihood Estimates of Voting across gig work categories",
+          dep.var.labels = "Voted",
+
+          covariate.labels = c("Non manual gig work", "Manual gig work", "Rely on gig work", "Casual gig work", "Under 26", "Sex (1 = M)", "High school eqv", "Higher degree", 
+                              "Has child/ren", "Second job", "Self-emp", "Financial Diff", 
+                              "St HH Income", "Migrant status"),
+           notes = "Respondents ineligible to vote filtered out, n = 1095.")
+
+
+
+
+```
+
+## Gig Work ##
+```{r}
+## Gig work - socioeconomic vars
+modelg_SE <- glm(gig_dummy ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelgr_SE <- glm(gig_rely ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelgc_SE <- glm(gig_dummy ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_gigcas)
+modelgnm_SE <- glm(gig_nonman ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelgm_SE <- glm(gig_man ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for, family = binomial(link = "probit"), data = ukls_final)
+
+## Gig work - precariousness vars
+modelg_PR <- glm(gig_dummy ~ sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgr_PR <- glm(gig_rely ~ sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgc_PR <- glm(gig_dummy ~ sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_gigcas)
+modelgnm_PR <- glm(gig_nonman ~ sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgm_PR <- glm(gig_man ~ sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+
+## Combined - with Migrant Status
+modelg_SEPR <- glm(gig_dummy ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgr_SEPR <- glm(gig_rely ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgc_SEPR <- glm(gig_cas ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgnm_SEPR <- glm(gig_nonman ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgm_SEPR <- glm(gig_man ~ sex + under_26 + edu + child_dummy + hhinc_st + born_for + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+
+## Combined - WITHOUT Migrant Status
+modelg_SEPR_nbf <- glm(gig_dummy ~ sex + under_26 + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgr_SEPR_nbf <- glm(gig_rely ~ sex + under_26 + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgc_SEPR_nbf <- glm(gig_cas ~ sex + under_26 + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgnm_SEPR_nbf <- glm(gig_nonman ~ sex + under_26 + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgm_SEPR_nbf <- glm(gig_man ~ sex + under_26 + edu + child_dummy + hhinc_st + sec_job + self_emp + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+
+stargazer(modelg_SE, modelgr_SE, modelg_PR, modelgr_PR, modelg_SEPR, modelgr_SEPR, type = "text")
+stargazer(modelgc_SE, modelgr_SE, modelgc_PR, modelgr_PR, modelgc_SEPR, modelgr_SEPR, type = "text")
+
+stargazer(modelg_SEPR, modelgr_SEPR, modelgc_SEPR, modelgnm_SEPR, modelgm_SEPR, type = "text")
+
+stargazer(modelg_SEPR, modelgc_SEPR, modelgr_SEPR, modelgnm_SEPR, modelgm_SEPR, type = "html", out = "gigwork_selection_all.html", 
+          title = "Maximum Likelihood Estimates for Selection into Gig Work",
+          dep.var.labels.include = F,
+          column.labels = c("All","Casual (<20hrs)","Rely (>=20hrs)","Non-Manual","Manual"),
+          covariate.labels = c("Sex (1 = M)", "Under age 26", "High school eqv", "Higher degree", "Has child/ren", "St. HH Income", "Second Job", "Self-emp","Financial diff", 
+                               "Migrant status"))
+
+
+stargazer(modelg_SEPR_nbf, modelgc_SEPR_nbf, modelgr_SEPR_nbf, modelgnm_SEPR_nbf, modelgm_SEPR_nbf, type = "html", out = "gigwork_selection_all.html", 
+          title = "Maximum Likelihood Estimates for Selection into Gig Work",
+          dep.var.labels.include = F,
+          column.labels = c("All","Casual (<20hrs)","Rely (>=20hrs)","Non-Manual","Manual"),
+          covariate.labels = c("Sex (1 = M)", "Under age 26", "High school eqv", "Higher degree", "Has child/ren", "St. HH Income", "Second Job", "Self-emp","Financial diff"))
+
+# Dot-Whistker plot of gig work coefficients - all/rely/not rely
+dotwhisker::dwplot(list(modelg_SEPR, modelgr_SEPR, modelgc_SEPR),
+            vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2)) %>%
+  relabel_predictors(c(
+            sex = "Sex (1 = M)", 
+            under_26 = "Under age 26", 
+            child_dummy = "Has child/ren",
+            fin_dif = "Financial diff", 
+            born_for = "Migrant status", 
+            sec_job = "Second job", 
+            eduHighSchool = "High school eqv", 
+            eduHigherEd = "Higher degree",
+            hhinc_st = "St HH Income",
+            self_emp = "Self-employed")) +
+  theme_bw() +
+  xlab("Coefficient Estimate") +
+  ggtitle("Predicting Selection into Gig Work - Casual vs Reliant") +
+  scale_color_discrete(name = "Model", labels = c("All","20+ Hours", "<20 Hours"))
+
+# Dot-Whistker plot of gig work coefficients - all/non-manual/manual
+dotwhisker::dwplot(list(modelg_SEPR, modelgnm_SEPR, modelgm_SEPR),
+            vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2)) %>%
+  relabel_predictors(c(
+            sex = "Sex (1 = M)", 
+            under_26 = "Under age 26", 
+            child_dummy = "Has child/ren",
+            fin_dif = "Financial diff", 
+            born_for = "Migrant status", 
+            sec_job = "Second job", 
+            eduHighSchool = "High school eqv", 
+            eduHigherEd = "Higher degree",
+            hhinc_st = "St HH Income",
+            self_emp = "Self-employed")) +
+  theme_bw() +
+  xlab("Coefficient Estimate") +
+  ggtitle("Predicting Selection into Gig Work - Manual vs Non-Manual") +
+  scale_color_discrete(name = "Model", labels = c("All","Non-manual","Manual"))
+```
+
+```{r}
+## Marginal Probability Tables - Naive Voting Models
+newdata_naive1 = data.frame(gig_dummy = 1)
+newdata_naive0 = data.frame(gig_dummy = 0)
+newdata_naive1_nm = data.frame(gig_nonman = 1)
+newdata_naive0_nm = data.frame(gig_nonman = 0)
+newdata_naive1_m = data.frame(gig_man = 1)
+newdata_naive0_m = data.frame(gig_man = 0)
+newdata_naive1_c = data.frame(gig_cas = 1)
+newdata_naive0_c = data.frame(gig_cas = 0)
+newdata_naive1_r = data.frame(gig_rely = 1)
+newdata_naive0_r = data.frame(gig_rely = 0)
+
+## Political Interest Marginal Probabilities
+newdata_SE0 = data.frame(gig_dummy = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0, cantvote_past2 = 0, born_for = 0)
+newdata_SE1 = data.frame(gig_dummy = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0, cantvote_past2 = 0, born_for = 0)
+
+predpi_naive <- predict(modelpi_naive, newdata_naive1, type = "response") - predict(modelpi_naive, newdata_naive0, type = "response") 
+predpi_SE <- predict(modelpi_SE, newdata_SE1, type = "response") - predict(modelpi_SE, newdata_SE0, type = "response") 
+predpi_PR <- predict(modelpi_PR, newdata_SE1, type = "response") - predict(modelpi_PR, newdata_SE0, type = "response") 
+predpi_CB <- predict(modelpi_CB, newdata_SE1, type = "response") - predict(modelpi_CB, newdata_SE0, type = "response") 
+predpi_all <- predict(modelpi_all, newdata_SE1, type = "response") - predict(modelpi_all, newdata_SE0, type = "response")
+
+predpi_df <- data.frame(pred_naive = predpi_naive) %>%
+  cbind(pred_SE = predpi_SE) %>%
+  cbind(pred_PR = predpi_PR) %>%
+  cbind(pred_CB = predpi_CB) %>%
+  cbind(pred_all = predpi_all) 
+
+knitr::kable(predpi_df, col.names = c("Naive","SE","Pr","Incl.","All")) %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  save_kable(file = "Marg_Prob-polint.html", self_contained = T)
+
+
+
+predv_all <- predict(modelv_naive, newdata_naive0, type = "response") - predict(modelv_naive, newdata_naive1, type = "response")
+predv_nm <- predict(modelv_naive_nm, newdata_naive0_nm, type = "response") - predict(modelv_naive_nm, newdata_naive1_nm, type = "response")
+predv_m <- predict(modelv_naive_m, newdata_naive0_m, type = "response") - predict(modelv_naive_m, newdata_naive1_m, type = "response")
+predv_c <- predict(modelv_naive_c, newdata_naive0_c, type = "response") - predict(modelv_naive_c, newdata_naive1_c, type = "response")
+predv_r <- predict(modelv_naive_r, newdata_naive0_r, type = "response") - predict(modelv_naive_r, newdata_naive1_r, type = "response")
+
+pred_df <- data.frame(pred_a = -1*predv_all) %>%
+  cbind(pred_nm = -1*predv_nm) %>%
+  cbind(pred_m = -1*predv_m) %>%
+  cbind(pred_c = -1*predv_c) %>%
+  cbind(pred_c = -1*predv_r) 
+
+knitr::kable(pred_df, col.names = c("All","Non Manual","Manual","Casual","Rely")) %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  save_kable(file = "Marg_Prob-voting_naive.html", self_contained = T)
+
+## Marginal Probablities - Full Models
+newdata_full0 = data.frame(gig_dummy = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full1 = data.frame(gig_dummy = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full0_nm = data.frame(gig_nonman = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full1_nm = data.frame(gig_nonman = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full0_m = data.frame(gig_man = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full1_m = data.frame(gig_man = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full0_c = data.frame(gig_cas = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full1_c = data.frame(gig_cas = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full0_r = data.frame(gig_rely = 0, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+newdata_full1_r = data.frame(gig_rely = 1, sex = 0, under_26 = 0, child_dummy = 0, fin_dif = 0, born_for = 0, sec_job = 0, edu = "No qual", self_emp = 0, hhinc_st = 0)
+
+
+predvfull_all <- predict(modelv_all, newdata_full1, type = "response") - predict(modelv_all, newdata_full0, type = "response") 
+predvfull_nm <- predict(modelv_all_nm, newdata_full1_nm, type = "response") - predict(modelv_all_nm, newdata_full0_nm, type = "response") 
+predvfull_m <- predict(modelv_all_m, newdata_full1_m, type = "response") - predict(modelv_all_m, newdata_full0_m, type = "response") 
+predvfull_c <- predict(modelv_all_c, newdata_full1_c, type = "response") - predict(modelv_all_c, newdata_full0_c, type = "response") 
+predvfull_r <- predict(modelv_all_r, newdata_full1_r, type = "response") - predict(modelv_all_r, newdata_full0_r, type = "response") 
+
+pred_df_all <- data.frame(pred_a = predvfull_all) %>%
+  cbind(pred_nm = predvfull_nm) %>%
+  cbind(pred_m = predvfull_m) %>%
+  cbind(pred_c = predvfull_c) %>%
+  cbind(pred_c = predvfull_r) 
+
+model_int_pi <- glm(pol_int ~ gig_man*under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st + cantvote_past2, family = binomial(link = "probit"), data = ukls_final)
+model_int_v <- glm(voted_past2p ~ gig_man*under_26 + sex + edu + child_dummy + sec_job + self_emp + fin_dif + hhinc_st, family = binomial(link = "probit"), data = ukls_voters)
+
+stargazer(model_int_pi, model_int_v, type = "text")
+
+```

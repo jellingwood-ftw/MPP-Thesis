@@ -1,0 +1,219 @@
+---
+title: "Appendix"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Old political interest regressions
+```{r}
+# Political Interest by gig_dummy, gender
+model1 <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"),
+            data = ukls_final)
+model1.1 <- glm(pol_int ~ gig_dummy + sex + edu + under_26, family = binomial(link = "probit"),
+            data = ukls_final)
+model1.2 <- glm(pol_int ~ gig_dummy*sex + edu + under_26, family = binomial(link = "probit"),
+            data = ukls_final)
+model1.1m <- glm(pol_int ~ gig_dummy + edu + under_26, family = binomial(link = "probit"),
+            data = ukls_m)
+model1.1f <- glm(pol_int ~ gig_dummy + edu + under_26, family = binomial(link = "probit"),
+            data = ukls_fm)
+model1.2f <- glm(pol_int ~ gig_dummy + edu + k_urban_dv + stu + under_26, 
+                 family = binomial(link = "probit"), data = ukls_fm)
+
+# political interest among under 26 YOs
+model_piy <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"), data = ukls_young)
+model_piy1 <- glm(pol_int ~ gig_dummy*sex, family = binomial(link = "probit"), data = ukls_young)
+
+# Table Output
+stargazer(model1, model1.1, model1.2, model1.1m, model1.1f, model1.2f, type = "html", out = "polint_gender.htm", column.labels = c("All","All","All","Men","Women","Women"))
+
+stargazer(model1, model1.1, model1.2, model1.1m, model1.1f, model1.2f, type = "text", column.labels = c("All","All","All","Men","Women","Women"))
+
+# Young subgroup analysis
+stargazer(model_piy, model_piy1, type = "text")
+
+```
+
+### Figuring out summary tables
+```{r}
+ 
+list_gig <- c("gig_dummy", "gig_nonman", "gig_man", "gig_rely", "gig_cas")
+list_vars <- c("sex", "edu","child_dummy","cantvote_past2")
+
+analysis_vars_df <- ukls_filter %>%
+  select(gig_dummyv, sexv, edu, child_dummyv, fin_difv)
+
+mod_frame <- apply(analysis_vars_df, 2 , table) %>%
+  #purrr::map(1) %>% 
+  dplyr::bind_rows()
+
+print(mod_frame)
+
+## Something else
+our_summary1 <-
+  list(
+    "Education" =
+       list("Higher Ed" = ~ n_perc(ukls_filter$edu == "Higher ed", digits = 1, na_rm = T),
+            "High School"  = ~ n_perc(ukls_filter$edu == "High school", digits = 1, na_rm = T),
+            "No qual" = ~ n_perc(ukls_filter$edu == "No qual", digits = 1, na_rm = T)),
+    "Gender" =
+       list("Male" = ~ n_perc0(ukls_filter$sexv == "Male", digits = 1),
+            "Female"  = ~ n_perc0(ukls_filter$sexv == "Female", digits = 1)))
+
+by_gig <- summary_table(dplyr::group_by(ukls_filter, gig_dummy), our_summary1)
+by_gig2 <- summary_table(ukls_filter, summaries = our_summary1, by = c("gig_dummy"))
+
+by_gig2
+
+freq_df <- ukls_final %>%
+  select(gig_dummy, sex, edu, child_dummy, fin_dif) %>%
+  group_by(gig_dummy) %>%
+  dplyr::summarize(Freq=n())
+
+
+gender_t <- tabyl(ukls_filter, sexv, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+edu_t <- tabyl(ukls_filter, edu, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+child_t <- tabyl(ukls_filter, child_dummyv, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+secjob_t <- tabyl(ukls_filter, sec_jobv, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+bornfor_t <- tabyl(ukls_filter, born_for, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+selfemp_t <- tabyl(ukls_filter, self_empv, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+findif_t <- tabyl(ukls_filter, fin_difv, gig_dummy) %>%
+  janitor:: adorn_percentages("col") %>%
+  janitor:: adorn_pct_formatting(digits = 2) %>%
+  janitor::adorn_ns()
+freq <- full_join(child_t, edu_t)
+freq <- full_join(freq, gender_t)
+freq <- full_join(freq, secjob_t)
+freq <- full_join(freq, selfemp_t)
+freq <- full_join(freq, findif_t)
+
+```
+
+### Old Voting regressions
+```{r}
+# Voting by gig_dummy, gender 
+model2 <- glm(voted_past2 ~ gig_dummy + pol_int*under_26 + edu + born_for, family = binomial(link =
+            "probit"), data = ukls_voters)
+model2.1 <- glm(voted_past2 ~ gig_dummy + sex + edu + pol_int, family =
+            binomial(link = "probit"),data = ukls_voters)
+model2.2 <- glm(voted_past2 ~ gig_dummy*sex + edu, family = binomial(link = "probit"),
+            data = ukls_voters)
+model2.1m <- glm(voted_past2 ~ gig_dummy + edu + pol_int + under_26, family = binomial(link = "probit"),
+            data = ukls_m)
+model2.1f <- glm(voted_past2 ~ gig_dummy + edu + pol_int, family = binomial(link = "probit"),
+            data = ukls_fm)
+model2.2f <- glm(voted_past2 ~ gig_dummy + edu + k_urban_dv + stu, 
+                 family = binomial(link = "probit"), data = ukls_fm)
+
+model2_hc_se <- coeftest(model2, vcov=vcovHC(model2,type="HC2"))
+
+# voting among under 26 YOs
+model_vy <- glm(voted_past2 ~ gig_dummy, family = binomial(link = "probit"), data = ukls_young)
+model_vy1 <- glm(voted_past2 ~ gig_dummy*sex, family = binomial(link = "probit"), data = ukls_young)
+
+# Table Outputs
+# Voting by gender
+stargazer(model2, model2_hc_se, model2.2, model2.1m, model2.1f, model2.2f, type = "html", out = "voting_gender.htm", column.labels = c("All","All","All","Men","Women","Women"))
+
+stargazer(model2, model2_hc_se, model2.2, model2.1m, model2.1f, model2.2f, type = "text", column.labels = c("All","All","All","Men","Women","Women"))
+
+# Young subgroup analysis
+stargazer(model_vy, model_vy1, type = "text")
+```
+
+### OLS Linear Regression
+
+```{r}
+# political interest on gig hours
+model1 <- lm(pol_int ~ gighrs_month + edu + k_sex, data = ukls_filter) 
+model1.2 <- lm(pol_int ~ gig_cat + edu + k_sex, data = ukls_filter)
+# political interest by sex, gig_dummy
+model1.3 <- lm(pol_int ~ k_sex, data = ukls_filter)
+model1.4 <- lm(pol_int ~ gig_dummy, data = ukls_m) # just men
+model1.5 <- lm(pol_int ~ gig_dummy, data = ukls_f) # just women
+
+# political interest on gig dummy
+model1.1 <- lm(pol_int ~ gig_dummy, data = ukls_filter) 
+model1.2 <- lm(pol_int ~ gig_dummy + edu, data = ukls_filter)
+model1.3 <- lm(pol_int ~ gig_dummy + edu + k_finnow, data = ukls_filter)
+
+# voted last election on gig dummy (dummy voted = 1)
+model2.1 <- lm(voted ~ gig_dummy, data = ukls_filter) 
+model2.2 <- lm(voted ~ gig_dummy + edu + k_sex, data = ukls_filter)
+model2.3 <- lm(voted ~ gig_dummy + edu + fin_dif, data = ukls_filter)
+# voted by sex
+model2.1 <- lm(voted ~ gig_dummy, data = ukls_filter) 
+model2.2 <- lm(voted ~ gig_dummy, data = ukls_m)
+model2.3 <- lm(voted ~ gig_dummy, data = ukls_f)
+```
+
+### Regressing Gig work on covariates - old code
+```{r}
+## Full sample
+modelg_0 <- glm(gig_dummy ~ sex + under_26 + edu, family = binomial(link = "probit"), data = ukls_final)
+modelg_1 <- glm(gig_dummy ~ sex + under_26 + edu + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelg_2 <- glm(gig_dummy ~ sex + under_26 + edu + born_for + child_dummy, family = binomial(link = "probit"), data = ukls_final)
+modelg_3 <- glm(gig_dummy ~ sex + under_26 + child_dummy + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelg_4 <- glm(gig_dummy ~ sex + under_26 + child_dummy + fin_dif + born_for + sec_job + stu + edu, family = binomial(link = "probit"), data = ukls_final)
+
+## Gig_rely as outcome, full sample
+modelgr_0 <- glm(gig_rely ~ sex + under_26 + edu, family = binomial(link = "probit"), data = ukls_final)
+modelgr_1 <- glm(gig_rely ~ sex + under_26 + edu + born_for, family = binomial(link = "probit"), data = ukls_final)
+modelgr_2 <- glm(gig_rely ~ sex + under_26 + edu + born_for + child_dummy, family = binomial(link = "probit"), data = ukls_final)
+modelgr_3 <- glm(gig_rely ~ sex + under_26 + child_dummy + fin_dif, family = binomial(link = "probit"), data = ukls_final)
+modelgr_4 <- glm(gig_rely ~ sex + under_26 + child_dummy + fin_dif + born_for + sec_job + stu + edu, family = binomial(link = "probit"), data = ukls_final)
+
+# Gig as outcome, with gig_rely filtered out 
+modelgc_4 <- glm(gig_dummy ~ sex + under_26 + child_dummy + fin_dif + born_for + sec_job + stu + edu, family = binomial(link = "probit"), data = ukls_gigcas)
+
+stargazer(modelg_0, modelg_0.1, modelg_1, modelg_2, modelg_3, modelg_4, type = "text")
+stargazer(modelgr_0, modelgr_1, modelgr_2, modelgr_3, modelgr_4, modelgc_4, type = "text")
+stargazer(modelg_0a, modelg_1a, modelg_2a, modelg_3a, modelg_4a, type = "text")
+
+# All three models: gig_dummy with full sample, gig_rely with full sample, gig_dummy without gig_rely
+stargazer(modelg_4, modelgr_4, modelgc_4, type = "text")
+stargazer(modelg_4, modelgr_4, modelgc_4, type = "html", out = "gigwork_selection.htm", 
+          title = "Selection into gig work by various known covariates",
+          dep.var.labels = c("Any gig work", "20+ gig work","<20 hrs gig work"),
+          covariate.labels = c("Sex (1 = M)", "Under age 26", "Has child/ren","Financial diff", 
+                               "Migrant status", "Second job", "Student status",
+                               "High school eqv", "Higher degree"))
+# Dot-Whistker plot of gig work coefficients
+dotwhisker::dwplot(list(modelg_4, modelgr_4, modelgc_4),
+            vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2)) %>%
+  relabel_predictors(c(
+            sex = "Sex (1 = M)", 
+            under_26 = "Under age 26", 
+            child_dummy = "Has child/ren",
+            fin_dif = "Financial diff", 
+            born_for = "Migrant status", 
+            sec_job = "Second job", 
+            stu = "Student status",
+            edu1 = "High school eqv", 
+            edu2 = "Higher degree")) +
+  theme_bw() +
+  xlab("Coefficient Estimate") +
+  ggtitle("Predicting Selection into Gig Work") +
+  scale_color_discrete(name = "Model", labels = c("All", "20+ Hours", "<20 Hours"))
+
+```

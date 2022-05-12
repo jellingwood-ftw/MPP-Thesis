@@ -1,0 +1,275 @@
+---
+title: "Matching"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Balance table
+names(ukls_filter)
+
+list_cov <- c("sex", "age", "k_hiqual_dv", "child_dummy", "k_nchunder16", "hhinc_st", 
+              "sec_job", "self_emp", "fin_dif", "born_for", "tot_hrs",
+              "health_bad", "k_urban_dv", "stu", "pol_int", 
+              "cantvote_past2", "tax_support", "brex_support") 
+list_ind <- c("k_gehrs", "k_gehrsp", "k_geearn", "k_geearnp",
+              "k_gelist1", "k_gelist2", "k_gelist3", "k_gelist4" , "k_gelist5",
+              "gig_dummy")
+
+## With gig_dummy as treatment
+main_covars_btable <- ukls_filter %>%
+  dplyr::summarize_at(list_cov, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>% 
+  rename("sex (1 = M)" = sex,
+        "Political Interest" = pol_int,
+         "Migrant Status" = born_for,
+         "Second Job" = sec_job,
+         "Self-employed" = self_emp,
+         "Edu level (5 = Higher Ed)" = k_hiqual_dv,
+         "Number of children" = k_nchunder16,
+         "Have child/ren" = child_dummy,
+         "St HH Income" = hhinc_st,
+         "Financial Difficulty" = fin_dif,
+         "Weekly working hours" = tot_hrs,
+         "Bad health" = health_bad,
+         "Urban" = k_urban_dv, 
+         "Student" = stu,
+         "Can't vote" = cantvote_past2,
+         "Support redistributive taxation (/10)" = tax_support,
+         "Support Brexit party (/10)" = brex_support) %>%
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate_if(is.numeric, round, 3) %>% 
+  knitr::kable(col.names = c("Variable", "Control (gig_dummy = 0)", "Treat (gig_dummy = 1)", "P value")) %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  save_kable(file = "Balance_table.html", self_contained = T)
+
+
+## With gig rely as treatment
+main_covars_btable_gigrely <- ukls_filter %>%
+  dplyr::summarize_at(list_cov, funs(list(broom::tidy(t.test(. ~ gig_rely))))) %>% 
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate_if(is.numeric, round, 3) %>% 
+  knitr::kable(col.names = c("Variable", "Control (gig_rely = 0)", "Treat (gig_rely = 1)", "P value")) %>%
+  kableExtra::kable_styling() 
+
+readr::write_file(main_covars_btable_gigrely, "balance_table-main_covars_gigrely.html")
+
+# Creating matched dataframe - Voting, all
+match_data_voting <- ukls_voters %>% 
+  dplyr::select(voted_past2p, age, sex, child_dummy, fin_dif, gig_dummy) %>% 
+  na.omit()
+
+nn_match_vote <- MatchIt::matchit(gig_dummy ~ sex + child_dummy + age + fin_dif, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_voting)
+
+data_nn_match_vote <- MatchIt::match.data(nn_match_vote)
+
+# Creating matched dataframe - Political Interest, all
+match_data_pi <- ukls_final %>% 
+  dplyr::select(pol_int, age, edu, sex, child_dummy, sec_job, gig_dummy) %>% 
+  na.omit()
+
+nn_match_pi <- MatchIt::matchit(gig_dummy ~ sex + edu + age + sec_job, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_pi)
+
+data_nn_match_pi <- MatchIt::match.data(nn_match_pi)
+
+# Running regression model on matched data
+m_model_vote <- glm(voted_past2p ~ gig_dummy, family = binomial(link = "probit"),
+                       data = data_nn_match_vote)
+m_model_pi <- glm(pol_int ~ gig_dummy, family = binomial(link = "probit"),
+                       data = data_nn_match_pi)
+stargazer(m_model_vote, m_model_pi, type = "html", out = "matched_models_all.html",
+          covariate.labels = "Gig work",
+          dep.var.labels = c("Voted", "Political Interest"),
+          title = "Maximum Likelihood Estimates using Matched Data",
+          notes = c("Voting matched on gender, having child/ren, age, and financial difficulty.", 
+          "Political interest matched on gender, education, age, and having a second job.")) 
+          
+
+## Checking balance of matched dataset ##
+
+# Voting
+list_match_vote <- c("age", "sex", "child_dummy", "fin_dif")
+
+data_nn_match_vote %>%
+  dplyr::summarize_at(list_match_vote, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>% 
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate_if(is.numeric, round, 3) %>% 
+  knitr::kable(col.names = c("Variable", "Control (gig_dummy = 0)", "Treat (gig_dummy = 1)", "P value")) %>%
+  kableExtra::kable_styling() 
+
+# Political Interest
+list_match_pi <- c("age", "sex", "child_dummy", "sec_job")
+
+data_nn_match_pi %>%
+  dplyr::summarize_at(list_match_pi, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>% 
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate_if(is.numeric, round, 3) %>% 
+  knitr::kable(col.names = c("Variable", "Control (gig_dummy = 0)", "Treat (gig_dummy = 1)", "P value")) %>%
+  kableExtra::kable_styling() 
+```
+### Non-Manual Matches
+```{r}
+# Creating matched dataframe - Voting, Non-manual
+match_data_voting_nm <- ukls_voters %>% 
+  dplyr::select(voted_past2p, age, sex, fin_dif, sec_job, edu, gig_nonman) %>% 
+  na.omit()
+
+nn_match_vote_nm <- MatchIt::matchit(gig_nonman ~ sex + age + fin_dif + edu, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_voting_nm)
+
+data_nn_match_vote_nm <- MatchIt::match.data(nn_match_vote_nm)
+
+# Creating matched dataframe - Political Interest, Non-manual
+match_data_pi_nm <- ukls_final %>% 
+  dplyr::select(pol_int, age, edu, sex, child_dummy, sec_job, gig_nonman) %>% 
+  na.omit()
+
+nn_match_pi_nm <- MatchIt::matchit(gig_nonman ~ sex + edu + age + sec_job, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_pi_nm)
+
+data_nn_match_pi_nm <- MatchIt::match.data(nn_match_pi_nm)
+
+# Running regression model on matched data
+m_model_vote_nm <- glm(voted_past2p ~ gig_nonman, family = binomial(link = "probit"),
+                       data = data_nn_match_vote_nm)
+m_model_pi_nm <- glm(pol_int ~ gig_nonman, family = binomial(link = "probit"),
+                       data = data_nn_match_pi_nm)
+stargazer(m_model_vote_nm, m_model_pi_nm, type = "text")
+
+```
+
+### Manual Matches
+```{r}
+# Creating matched dataframe - Voting, Manual
+match_data_voting_m <- ukls_voters %>% 
+  dplyr::select(voted_past2p, age, sex, fin_dif, edu, gig_man) %>% 
+  na.omit()
+
+nn_match_vote_m <- MatchIt::matchit(gig_man ~ sex + age + fin_dif + edu, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_voting_m)
+
+data_nn_match_vote_m <- MatchIt::match.data(nn_match_vote_m)
+
+# Creating matched dataframe - Political Interest, Manual
+match_data_pi_m <- ukls_final %>% 
+  dplyr::select(pol_int, age, edu, sex, child_dummy, sec_job, gig_man) %>% 
+  na.omit()
+
+nn_match_pi_m <- MatchIt::matchit(gig_man ~ sex + edu + age + sec_job, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_pi_m)
+
+data_nn_match_pi_m <- MatchIt::match.data(nn_match_pi_m)
+
+# Running regression model on matched data
+m_model_vote_m <- glm(voted_past2p ~ gig_man, family = binomial(link = "probit"),
+                       data = data_nn_match_vote_m)
+m_model_pi_m <- glm(pol_int ~ gig_man, family = binomial(link = "probit"),
+                       data = data_nn_match_pi_m)
+stargazer(m_model_vote_m, m_model_pi_m, type = "text")
+
+```
+
+### Rely Matches
+```{r}
+# Creating matched dataframe - Voting, Manual
+match_data_voting_r <- ukls_voters %>% 
+  dplyr::select(voted_past2p, age, sex, fin_dif, edu, gig_rely) %>% 
+  na.omit()
+
+nn_match_vote_r <- MatchIt::matchit(gig_rely ~ sex + age + fin_dif + edu, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_voting_r)
+
+data_nn_match_vote_r <- MatchIt::match.data(nn_match_vote_r)
+
+# Creating matched dataframe - Political Interest, Manual
+match_data_pi_r <- ukls_final %>% 
+  dplyr::select(pol_int, age, edu, sex, child_dummy, sec_job, gig_rely) %>% 
+  na.omit()
+
+nn_match_pi_r <- MatchIt::matchit(gig_rely ~ sex + edu + age + sec_job, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_pi_r)
+
+data_nn_match_pi_r <- MatchIt::match.data(nn_match_pi_r)
+
+# Running regression model on matched data
+m_model_vote_r <- glm(voted_past2p ~ gig_rely, family = binomial(link = "probit"),
+                       data = data_nn_match_vote_r)
+m_model_pi_r <- glm(pol_int ~ gig_rely, family = binomial(link = "probit"),
+                       data = data_nn_match_pi_r)
+stargazer(m_model_vote_r, m_model_pi_r, type = "text")
+
+```
+
+### Casual Matches
+```{r}
+# Creating matched dataframe - Voting, Manual
+match_data_voting_c <- ukls_voters %>% 
+  dplyr::select(voted_past2p, age, sex, fin_dif, edu, gig_cas) %>% 
+  na.omit()
+
+nn_match_vote_c <- MatchIt::matchit(gig_cas ~ sex + age + fin_dif + edu, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_voting_c)
+
+data_nn_match_vote_c <- MatchIt::match.data(nn_match_vote_c)
+
+# Creating matched dataframe - Political Interest, Manual
+match_data_pi_c <- ukls_final %>% 
+  dplyr::select(pol_int, age, edu, sex, child_dummy, sec_job, gig_cas) %>% 
+  na.omit()
+
+nn_match_pi_c <- MatchIt::matchit(gig_cas ~ sex + edu + age + sec_job, 
+                                method = "nearest",
+                             replace = T,
+                                data = match_data_pi_c)
+
+data_nn_match_pi_c <- MatchIt::match.data(nn_match_pi_c)
+
+# Running regression model on matched data
+m_model_vote_c <- glm(voted_past2p ~ gig_cas, family = binomial(link = "probit"),
+                       data = data_nn_match_vote_c)
+m_model_pi_c <- glm(pol_int ~ gig_cas, family = binomial(link = "probit"),
+                       data = data_nn_match_pi_c)
+stargazer(m_model_vote_c, m_model_pi_c, type = "text")
+
+```
+
+## Table with all matched models
+```{r}
+stargazer(m_model_pi, m_model_vote, m_model_pi_nm, m_model_vote_nm, m_model_pi_m, m_model_vote_m, m_model_pi_r, m_model_vote_r, m_model_pi_c, m_model_vote_c, type = "html", out = "matched_models_all.html",
+          covariate.labels = c("Gig work - all", "Non manual gig", "Manual gig", "Rely on gig work", "Casual gig work"),
+          dep.var.labels = c("Political Interest", "Voted","Political Interest", "Voted","Political Interest", "Voted","Political Interest", "Voted","Political Interest", "Voted"),
+          title = "Maximum Likelihood Estimates using Matched Data",
+          notes = c("Voting matched on gender, having child/ren, age, and financial difficulty.", 
+          "Political interest matched on gender, education, age, and having a second job.")) 
+
+```

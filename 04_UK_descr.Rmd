@@ -1,0 +1,365 @@
+---
+title: "UK descriptive"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Frequency Table of Relevant Vars
+```{r}
+
+## Using datasummary_balance for summary data
+
+lil_df <- ukls_filter %>%
+  select(gig_dummyv, sexv, age, under_26v, edu, hhinc_month, child_dummyv, self_empv, fin_difv, sec_jobv, born_forv, cantvote_past2v) 
+
+lil_df$gig_dummyv <- as.vector(lil_df$gig_dummyv)
+lil_df$age <- as.vector(lil_df$age)
+lil_df$hhinc_month <- as.vector(lil_df$hhinc_month)
+lil_df$edu <- as.vector(lil_df$edu)
+lil_df$child_dummyv <- as.vector(lil_df$child_dummyv)
+lil_df$self_empv <- as.vector(lil_df$self_empv)
+lil_df$fin_difv <- as.vector(lil_df$fin_difv)
+lil_df$sec_jobv <- as.vector(lil_df$sec_jobv)
+lil_df$born_forv <- as.vector(lil_df$born_forv)
+lil_df$under_26v <- as.vector(lil_df$under_26v)
+lil_df$cantvote_past2v <- as.vector(lil_df$cantvote_past2v)
+
+caption <- 'Descriptive statistics about gig workers and non gig workers. This table was created using the "datasummary" function from the "modelsummary" package for R.'
+reference <- 'Source: UK Longitudinal Study, Wave 11.'
+
+sum_table <- modelsummary::datasummary_balance(~ gig_dummyv,
+              data = lil_df, 
+              notes = reference, 
+              output = "sum_table.html")
+
+
+
+ukls_filter %>%
+  filter(gig_dummy == 1) %>%
+  janitor::tabyl(gig_rely, gig_nonman) %>%
+  adorn_totals(c("row","col")) %>%
+  #adorn_percentages(c("row","col")) %>%
+  #adorn_pct_formatting(digits = 2) %>%
+  #adorn_ns() %>%
+  knitr::kable(col.names = c("Rely on Gig Work","Manual","Non Manual", "Total")) %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  save_kable(file = "gig_work_dimensions.html", self_contained = T)
+
+liler_df <- ukls_filter %>%
+  select(born_for, cantvote_past2)
+
+liler_df <- na.omit(liler_df)
+correlate(liler_df, method = "pearson")
+```
+
+## Hetergeneity by subgroups
+```{r}
+resp_covars <- c("sexv", "edu", "sec_jobv", "child_dummyv", "self_empv", "fin_difv", "under_26v")
+
+direct_items_vec <- c("pol_int", "voted_past2p")
+item_labels <- c('Political Interest', 'Voted')
+items_labels_df <- data.frame(item = direct_items_vec, item_label = item_labels, stringsAsFactors = FALSE)
+
+covars <- c(resp_covars , "gig_man")
+interaction_terms <- expand.grid(" ~ gig_man*", resp_covars, "+") %>% pmap_chr(paste, collapse = "")
+covar_terms <- paste0(resp_covars, collapse = " + ")
+fmlas <- expand.grid(direct_items_vec, interaction_terms, covar_terms) %>% pmap_chr(paste, collapse = "") %>% map(as.formula) 
+interaction_vars <- map(fmlas, str_extract, "\\* [[:alnum:]_]+") %>% unlist %>% str_replace("\\* ", "") %>% na.exclude() %>% as.character()
+
+# run models
+consequences_models_heterogeneity <- map(fmlas, glm, family = binomial(link = "probit"), data = ukls_final)
+
+# function to extract estimates
+tidy_heterogeneous <- function(x, treatment = "", covar = "", adjust = "none", data = NULL) {
+  fmla <- as.formula(paste("~", treatment, "*", covar, collapse = ""))
+  out <- emmeans(x, fmla, rg.limit = 20000) %>% 
+    contrast("revpairwise", by = covar, adjust = adjust) %>% 
+    tidy(conf.int = TRUE, conf.level = 0.95) %>% rename(covar_values = all_of(covar))
+  out$outcome <- names(x$model)[1]
+  out$covar <- covar
+  out$covar_label <- attr(as.data.frame(data)[,covar], "label")
+  out
+}
+
+# extract estimates
+consequences_models_heterogeneity_est <- pmap_dfr(list(x = consequences_models_heterogeneity, 
+          treatment = "gig_man",
+          covar = interaction_vars),
+     tidy_heterogeneous,
+     data = ukls_final
+     )
+
+# heterogeneity coefficient plot
+dat <- consequences_models_heterogeneity_est %>% group_by(outcome) %>% arrange(estimate) %>% mutate(xpos = 1:n())
+dat$outcome <- factor(dat$outcome)
+levels(dat$outcome) <- str_replace_all(item_labels, "\\n", " ")
+dat %<>% unite("group_label", covar_values, sep = ": ", remove = FALSE) # removed covar_label,
+
+pdf(file="covars_gig-het_manual.pdf", height=5, width=9, family="Helvetica")
+par(oma=c(0,4,0,0) + .1)
+par(mar=c(0, 4, 0, 0))
+dodge <- .5
+ggplot(dat, aes(x = xpos, y = estimate)) +
+  geom_hline(yintercept = 0, colour = gray(1/2), lty = 2) +
+  geom_point(aes(x = xpos, 
+                 y = estimate),
+             position = position_dodge2(width = dodge)) + 
+  geom_linerange(aes(x = xpos, 
+                     ymin = asymp.LCL,
+                     ymax = asymp.UCL),
+                 lwd = 1/2,
+                 position = position_dodge2(width = dodge)) +
+  geom_text(aes(x = xpos, y = asymp.UCL+.02, label = group_label), hjust = "left", size = 3) + 
+  coord_flip() + 
+  facet_grid(. ~ outcome, labeller = label_wrap_gen(width = 20)) +
+  theme_bw() + 
+  scale_x_discrete() + 
+  #scale_y_continuous(limits = c(NA, 1)) + 
+  ylab("Estimated effects (Manual Gig work) by subgroup") + xlab("") + 
+  theme(axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.position= "none",
+        legend.title=element_text(size = 10),
+        legend.margin=margin(-10,0,0,0),
+        legend.spacing.x = unit(.25, 'cm'),
+        plot.margin=unit(c(0.1,0.1,0.5,0.1),"cm"))
+dev.off()
+
+
+```
+
+## Missingness
+```{r}
+## Crosstabs - exploring missingness for key vars with gig work
+
+colSums(is.na(ukls_g1))  
+
+cantvote <- table(ukls_filter$gig_dummy, ukls_filter$cant_vote, exclude = NULL)
+ftable(cantvote)
+
+voted <- table(ukls_filter$gig_dummy, ukls_filter$voted, exclude = NULL)
+ftable(voted)
+
+ukls_filter %>%
+ filter(gig_dummy == 1) %>%
+  select(born_for, voted_past2) %>%
+  VIM::aggr(numbers = T)
+
+model_polintNA <- glm(missing_polint ~ gig_dummy, family = binomial(link = "probit"), data = ukls_final)
+model_voting19NA <- glm(missing_vote2019 ~ gig_dummy, family = binomial(link = "probit"), data = ukls_final)
+model_voting1719NA <- glm(missing_votepast2 ~ gig_dummy, family = binomial(link = "probit"), data = ukls_final)
+model_bornforNA <- glm(missing_born_for ~ gig_dummy, family = binomial(link = "probit"), data = ukls_final)
+
+stargazer(model_polintNA, model_votingNA, model_voting1719NA, model_bornforNA, type = "text")
+
+list_missing <- c("missing_polint", "missing_vote2019", "missing_vote2017", "missing_votepast2p", "missing_born_for", "missing_sec_job", "missing_self_emp", "missing_cantvote")
+ukls_final %>%
+  dplyr::summarize_at(list_missing, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>%
+  rename("Political Interest" = missing_polint,
+         "Voted 2019" = missing_vote2019,
+         "Voted 2017" = missing_vote2017,
+         "Voted either 2017 or 2019" = missing_votepast2p,
+         "Migrant Status" = missing_born_for,
+         "Second Job" = missing_sec_job,
+         "Self-employed" = missing_self_emp) %>%
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate(estimate1 = estimate1*100,
+                estimate2 = estimate2*100) %>%
+  dplyr::mutate_if(is.numeric, round, 2) %>% 
+  knitr::kable(col.names = c("Missing Variable", "Gig Work = 0 (%)", 
+                             "Gig Work = 1 (%)", "P value")) %>%
+  kableExtra::kable_styling(full_width = F)%>%
+  save_kable(file = "missingness.html", self_contained = T)
+
+ukls_emp %>%
+  dplyr::summarize_at(list_missing, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>%
+  rename("Political Interest" = missing_polint,
+         "Voted 2019" = missing_vote2019,
+         "Voted 2017" = missing_vote2017,
+         "Voted either 2017 or 2019" = missing_votepast2p,
+         "Migrant Status" = missing_born_for,
+         "Second Job" = missing_sec_job,
+         "Self-employed" = missing_self_emp) %>%
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate(estimate1 = estimate1*100,
+                estimate2 = estimate2*100) %>%
+  dplyr::mutate_if(is.numeric, round, 2) %>% 
+  knitr::kable(col.names = c("Missing Variable", "Gig Work = 0 (%)", 
+                             "Gig Work = 1 (%)", "P value")) %>%
+  kableExtra::kable_styling(full_width = F)%>%
+  save_kable(file = "missingness_emp.html", self_contained = T)
+
+```
+
+## Balance Table ##
+```{r}
+list_cov <- c("k_hiqual_dv", "k_sex", "age", "k_nchunder16", "child_dummy", "fin_dif", 
+              "pol_int", "health_bad", "k_urban_dv", "stu", "self_emp") 
+
+ukls_filter %>%
+  dplyr::summarize_at(list_cov, funs(list(broom::tidy(t.test(. ~ gig_dummy))))) %>% 
+  purrr::map(1) %>% 
+  dplyr::bind_rows(.id='variables') %>% 
+  dplyr::select(variables, estimate1, estimate2, p.value) %>% 
+  dplyr::mutate_if(is.numeric, round, 3) %>% 
+  knitr::kable(col.names = c("Variable", "Control (gig_dummy = 0)", "Treat (gig_dummy = 1)", "P value")) %>% 
+  kableExtra::kable_styling() %>%
+  save_kable(file = "balance_table.html", self_contained = T)
+
+```
+### Gig work crosstabs
+```{r}
+# Non manual gig work x gender
+ukls_final %>%
+  mutate(Gender = if_else(sex == 1, "M", "F")) %>%
+  janitor::tabyl(Gender, gig_nonman) %>%
+  janitor::adorn_totals("row") %>%
+  janitor::adorn_percentages("col") %>%
+  janitor::adorn_pct_formatting(digits = 1) %>%
+  janitor::adorn_ns() %>% 
+  knitr::kable() %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  kableExtra::add_header_above(c("", "Non Manual Gig Work" = 2))  %>%
+  save_kable(file = "gig_nonman_table.html", self_contained = T)
+
+# All gig work x gender
+ukls_final %>%
+  mutate(Gender = if_else(sex == 1, "M", "F")) %>%
+  janitor::tabyl(Gender, gig_dummy) %>%
+  janitor::adorn_totals("row") %>%
+  janitor::adorn_percentages("col") %>%
+  janitor::adorn_pct_formatting(digits = 1) %>%
+  janitor::adorn_ns() %>% 
+  knitr::kable() %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  kableExtra::add_header_above(c("", "Gig Work" = 2))  %>%
+  save_kable(file = "gig_table.html", self_contained = T)
+
+# Manual gig work x gender
+ukls_final %>%
+  mutate(Gender = if_else(sex == 1, "M", "F")) %>%
+  janitor::tabyl(Gender, gig_man) %>%
+  janitor::adorn_totals("row") %>%
+  janitor::adorn_percentages("col") %>%
+  janitor::adorn_pct_formatting(digits = 1) %>%
+  janitor::adorn_ns() %>% 
+  knitr::kable() %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  kableExtra::add_header_above(c("", "Manual Gig Work" = 2))  %>%
+  save_kable(file = "gig_man_table.html", self_contained = T)
+
+ukls_final %>%
+  rename(Gig = gig_dummy) %>%
+  janitor::tabyl(Gig, cantvote_past2) %>%
+  janitor::adorn_totals("row") %>%
+  janitor::adorn_percentages("col") %>%
+  janitor::adorn_pct_formatting(digits = 1) %>%
+  janitor::adorn_ns() %>% 
+  knitr::kable() %>%
+  kableExtra::kable_styling(full_width = F) %>%
+  kableExtra::add_header_above(c("", "Can't Vote" = 3))  %>%
+  save_kable(file = "gig_voter_table.html", self_contained = T)
+```
+
+
+## Density Plots 
+```{r}
+## Age by gig_dummy
+age_gig <- ggplot(ukls_filter, aes(x = age, fill = factor(gig_dummy))) + 
+  geom_density(alpha = .5) + 
+  theme_minimal() + 
+  labs(x = "Age",
+       y = "Density",
+       fill = "20+ Gig Hours/Month") +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Not gig worker", "Gig worker")) +
+  ggtitle("Gig Workers and Non-Gig Workers by Age")
+
+
+```
+```{r}
+## Hours worked - by non-manual/manual
+hours_man <- ukls_filter %>%
+  filter(gig_dummy == 1) %>%
+ggplot(aes(x = gighrs_month, fill = factor(gig_nonman))) + 
+  geom_density(alpha = .5) + 
+  theme_minimal() + 
+  labs(x = "Hours Worked",
+       y = "Density",
+       fill = "Non-Manual Gig Work") +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Manual", "Non-Manual")) +
+  ggtitle("Gig Workers by Hours Worked - Manual and Non-Manual")
+
+
+```
+
+```{r}
+## Gig hours worked - male and female
+hours_gender <- ukls_filter %>%
+  filter(gig_dummy ==1) %>%
+  ggplot(aes(x = gighrs_month, fill = factor(sexv))) + 
+  geom_density(alpha = .5) + 
+  theme_minimal() + 
+  labs(x = "Hours Worked",
+       y = "Density",
+       fill = "Gender") +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Female", "Male")) +
+  ggtitle("Gig Workers by Hours Worked - Gender")
+
+
+```
+
+```{r}
+## Gig workers by age - non-manual and manual
+age_manual <- ukls_filter %>%
+  filter(gig_dummy ==1) %>%
+  ggplot(aes(x = age, fill = factor(gig_nonman))) + 
+  geom_density(alpha = .5) + 
+  theme_minimal() + 
+    labs(x = "Age",
+       y = "Density",
+       fill = "Non-Manual Gig Work") +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Manual", "Non-Manual")) +
+  ggtitle("Gig Workers by Age - Manual and Non-Manual Workers")
+
+
+```
+
+```{r}
+## Gig by age - rely and casual
+age_rely <- ukls_filter %>%
+  filter(gig_dummy ==1) %>%
+  ggplot(aes(x = age, fill = factor(gig_rely))) + 
+  geom_density(alpha = .5) + 
+  theme_minimal() +
+  labs(x = "Age",
+       y = "Density",
+       fill = "20+ Gig Hours/Month") +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("< 20hrs", ">=20hrs")) +
+  ggtitle("Gig Workers by Age - Reliant on and Casual")
+
+```
+
+## Selection of ggplots
+```{r}
+grid.arrange(age_gig, age_rely, age_manual, nrow = 3, heights = c(2, 2, 2))
+
+grid.arrange(hours_gender, hours_man, nrow = 2)
+
+```
