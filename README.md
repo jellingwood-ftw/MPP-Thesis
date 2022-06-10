@@ -14,4 +14,4 @@ Note that the files are numbered 01-06:
 The full thesis document is called ellingwood_julia_master_thesis.pdf.
 
 ## Data
-This thesis was written using data from Wave 11 of Understanding Society: the UK Longitudinal Study Main Survey, produced by the UK Data Service. I do not have permission to share this data and thus my data files are not shared in this repository. 
+This thesis was written using data from Wave 11 of Understanding Society: the UK Longitudinal Study Main Survey, produced by the UK Data Service. I do not have permission to share these data and thus my data files are not shared in this repository. 
